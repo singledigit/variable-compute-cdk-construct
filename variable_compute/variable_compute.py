@@ -82,7 +82,10 @@ class VariableCompute(Construct):
         task_definition.add_container(
             id="Container",
             image=ecs.ContainerImage.from_docker_image_asset(docker_image_asset),
-            port_mappings=[ecs.PortMapping(container_port=3000)]
+            port_mappings=[ecs.PortMapping(container_port=3000)],
+            environment={
+                "FARGATE": "true"
+            }
         )
         
         fargate_service = ecs.FargateService(

@@ -6,6 +6,7 @@ from aws_cdk import (
     aws_route53_targets as targets,
     aws_certificatemanager as acm,
     aws_elasticloadbalancingv2 as elbv2,
+    CfnOutput as output,
     Environment
 )
 from constructs import Construct
@@ -60,3 +61,6 @@ class HybridConstructStack(Stack):
             vpc=vpc,
             cluster=cluster
         )
+        
+        # Outputs
+        output(self, "LoadBalancerDNS", value=alb.load_balancer_dns_name)
