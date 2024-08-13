@@ -6,7 +6,6 @@ from aws_cdk import (
     aws_route53_targets as targets,
     aws_certificatemanager as acm,
     aws_elasticloadbalancingv2 as elbv2,
-    aws_elasticloadbalancingv2_targets as elbv2_targets,
     Environment
 )
 from constructs import Construct
@@ -45,7 +44,6 @@ class HybridConstructStack(Stack):
             load_balancer_name="HybridAlb"
         )
         
-         # Create Route 53 Alias Record
         route53.ARecord(self, "AliasRecord",
             zone=hosted_zone,
             target=route53.RecordTarget.from_alias(targets.LoadBalancerTarget(alb)),
@@ -59,5 +57,6 @@ class HybridConstructStack(Stack):
             runtime=lambda_.Runtime.PYTHON_3_12,
             alb=alb,
             certificate=certificate,
-            vpc=vpc
+            vpc=vpc,
+            cluster=cluster
         )

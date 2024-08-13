@@ -1,4 +1,7 @@
 def handler(event, context):
+    response_text = 'Hello from Lambda'
+    if 'fargate' in context and context['fargate']:
+        response_text = 'Hello from Fargate'
     return {
         'statusCode': 200,
         'statusDescription': "200 ok",
@@ -7,5 +10,5 @@ def handler(event, context):
             "content-type": "text/html",
             "tester":"my-header",
         },
-        'body': 'Hello from AWS Lambda'
+        'body': response_text
     }
