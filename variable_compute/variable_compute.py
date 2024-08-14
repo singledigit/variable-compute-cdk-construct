@@ -23,9 +23,10 @@ class VariableCompute(Construct):
                  code_location: str,
                  handler: str,
                  runtime: lambda_.Runtime,
+                 url_path: str,
                  vpc: ec2.Vpc,
-                 alb: elbv2.ApplicationLoadBalancer,
-                 certificate: elbv2.ListenerCertificate,
+                 listener: elbv2.ApplicationListener,
+                 priority: int,
                  cluster: ecs.Cluster,
                  **kwargs
                  ):
@@ -108,16 +109,32 @@ class VariableCompute(Construct):
             target_group=fargate_target_group
         )
 
-        listener = alb.add_listener("HttpsListener",
-            port=443,
-            certificates=[certificate],
-            default_action=elbv2.ListenerAction.weighted_forward(
+        # listener = alb.add_listener("HttpsListener",
+        #     port=443,
+        #     certificates=[certificate],
+        #     default_action=elbv2.ListenerAction.weighted_forward(
+        #         target_groups=[
+        #             weighted_lambda_target_group,
+        #             weighted_fargate_target_group
+        #         ]
+        #     )
+        # )
+        
+        # Adds condition for the path
+        route_rule = elbv2.ApplicationListenerRule(self, "PathRule",
+            listener=listener,
+            priority=priority,
+            conditions=[elbv2.ListenerCondition.path_patterns([url_path])],
+            action=elbv2.ListenerAction.weighted_forward(
                 target_groups=[
                     weighted_lambda_target_group,
                     weighted_fargate_target_group
                 ]
             )
         )
+        
+        route_rule.node.add_dependency(lambda_target_group)
+        route_rule.node.add_dependency(fargate_target_group)
         
         ## State Machine
         state_machine_role = iam.Role(self, "StateMachineRole",
@@ -129,7 +146,9 @@ class VariableCompute(Construct):
         
         state_machine_role.add_to_policy(iam.PolicyStatement(
             actions=[
+                "elasticloadbalancing:ModifyRule",
                 "elasticloadbalancing:ModifyListener",
+                "elasticloadbalancing:DescribeRules",
                 "elasticloadbalancing:DescribeListeners",
                 "elasticloadbalancing:DescribeTargetGroups",
                 "elasticloadbalancing:DescribeTargetHealth",
@@ -167,10 +186,10 @@ class VariableCompute(Construct):
         is_fargate_active_choice.when(sfn.Condition.number_greater_than_equals("$.result.Services[0].RunningCount", 3), 
                                       tasks.CallAwsService(self, "Fargate",
                                         service="elasticloadbalancingv2",
-                                        action="modifyListener",
+                                        action="modifyRule",
                                         parameters={
-                                            "ListenerArn": listener.listener_arn,
-                                            "DefaultActions": [
+                                            "RuleArn": route_rule.listener_rule_arn,
+                                            "Actions": [
                                                 {
                                                     "Type": "forward",
                                                     "ForwardConfig": {
@@ -197,10 +216,10 @@ class VariableCompute(Construct):
 
         lambda_task = tasks.CallAwsService(self, "Lambda",
             service="elasticloadbalancingv2",
-            action="modifyListener",
+            action="modifyRule",
             parameters={
-                "ListenerArn": listener.listener_arn,
-                "DefaultActions": [
+                "RuleArn": route_rule.listener_rule_arn,
+                "Actions": [
                     {
                         "Type": "forward",
                         "ForwardConfig": {
@@ -238,5 +257,6 @@ class VariableCompute(Construct):
 
         state_machine = sfn.StateMachine(self, "TargetSwapperStateMachine",
             definition_body=sfn.DefinitionBody.from_chainable(choice_state),
+            type=sfn.StateMachineType.EXPRESS,
             role=state_machine_role
         )

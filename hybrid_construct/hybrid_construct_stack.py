@@ -19,26 +19,32 @@ class HybridConstructStack(Stack):
         env = Environment(account="088483494489", region="us-west-2")
         super().__init__(scope, construct_id, env=env, **kwargs)
         
+        
+        # VPC for fargate
         vpc = ec2.Vpc(
             self, "VPC",
             max_azs=2
         )
 
+        # Cluster for Fargate
         cluster = ecs.Cluster(
             self, "Cluster",
             vpc=vpc
         )
         
+        # Zone for custom domain
         hosted_zone = route53.HostedZone.from_lookup(
             self, "HostedZone",
             domain_name="slip.link"
         )
 
+        # certificate for custom domain
         certificate = acm.Certificate.from_certificate_arn(
             self, "Certificate",
             certificate_arn="arn:aws:acm:us-west-2:088483494489:certificate/06e43f8a-3e6a-4bdf-adb3-7fc17100ee21"
         )
         
+        # ALB for routing
         alb = elbv2.ApplicationLoadBalancer(self, "HybridAlb",
             vpc=vpc,
             internet_facing=True,
@@ -51,16 +57,43 @@ class HybridConstructStack(Stack):
             record_name="hybrid.slip.link"
         )
         
-        var_compute = VariableCompute(
-            self, "VariableCompute",
-            code_location="src/func",
-            handler="handler.handler",
-            runtime=lambda_.Runtime.PYTHON_3_12,
-            alb=alb,
-            certificate=certificate,
-            vpc=vpc,
-            cluster=cluster
+        # Default listener
+        listener = alb.add_listener("HttpsListener",
+            port=443,
+            certificates=[certificate],
+            default_action=elbv2.ListenerAction.fixed_response(
+                status_code=404,
+                content_type="text/plain",
+                message_body="Page not found"
+            )
         )
         
-        # Outputs
-        output(self, "LoadBalancerDNS", value=alb.load_balancer_dns_name)
+        
+        # Variable compute constructs
+        compute_configs = [
+            {
+                "id": "VariableCompute1",
+                "code_location": "src/func1",
+                "url_path": "/route1",
+                "runtime": lambda_.Runtime.PYTHON_3_12
+            },
+            {
+                "id": "VariableCompute2",
+                "code_location": "src/func2",
+                "url_path": "/route2",
+                "runtime": lambda_.Runtime.PYTHON_3_9
+            }
+        ]
+
+        for index, config in enumerate(compute_configs, start=1):  # start=1 to begin from 1
+            VariableCompute(
+                self, config["id"],
+                code_location=config["code_location"],
+                handler="handler.handler",
+                runtime=config["runtime"],
+                url_path=config["url_path"],
+                listener=listener,
+                priority=index,  # Use the loop index as the priority
+                vpc=vpc,
+                cluster=cluster
+            )
