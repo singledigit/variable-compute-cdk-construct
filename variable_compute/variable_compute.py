@@ -28,6 +28,7 @@ class VariableCompute(Construct):
                  listener: elbv2.ApplicationListener,
                  priority: int,
                  cluster: ecs.Cluster,
+                 desired_task_count: int,
                  **kwargs
                  ):
         super().__init__(scope, id, **kwargs)
@@ -165,7 +166,7 @@ class VariableCompute(Construct):
             parameters={
                 "Cluster": cluster.cluster_name,
                 "Service": fargate_service.service_name,
-                "DesiredCount": 3
+                "DesiredCount": desired_task_count
             },
             iam_resources=["*"],
             result_path="$.result"
@@ -257,6 +258,6 @@ class VariableCompute(Construct):
 
         state_machine = sfn.StateMachine(self, "TargetSwapperStateMachine",
             definition_body=sfn.DefinitionBody.from_chainable(choice_state),
-            type=sfn.StateMachineType.EXPRESS,
+            state_machine_type=sfn.StateMachineType.STANDARD,
             role=state_machine_role
         )

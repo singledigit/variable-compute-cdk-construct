@@ -75,13 +75,15 @@ class HybridConstructStack(Stack):
                 "id": "VariableCompute1",
                 "code_location": "src/func1",
                 "url_path": "/route1",
-                "runtime": lambda_.Runtime.PYTHON_3_12
+                "runtime": lambda_.Runtime.PYTHON_3_12,
+                "desired_task_count": 2
             },
             {
                 "id": "VariableCompute2",
                 "code_location": "src/func2",
                 "url_path": "/route2",
-                "runtime": lambda_.Runtime.PYTHON_3_9
+                "runtime": lambda_.Runtime.PYTHON_3_9,
+                "desired_task_count": 2
             }
         ]
 
@@ -95,5 +97,6 @@ class HybridConstructStack(Stack):
                 listener=listener,
                 priority=index,  # Use the loop index as the priority
                 vpc=vpc,
-                cluster=cluster
+                cluster=cluster,
+                desired_task_count=config["desired_task_count"]
             )
